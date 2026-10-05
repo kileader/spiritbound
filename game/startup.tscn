@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://studio/phicid_splash.tscn" id="1_splash"]
+
+[node name="Startup" instance=ExtResource("1_splash")]
+next_scene_path = "res://game/main.tscn"

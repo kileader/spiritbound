@@ -1,6 +1,7 @@
 extends SceneTree
 
-const SplashScene = preload("res://studio/phicid_splash.tscn")
+const SharedSplashScene = preload("res://studio/phicid_splash.tscn")
+const SplashScene = preload("res://game/startup.tscn")
 var checks := 0
 var failures: Array[String] = []
 
@@ -33,7 +34,10 @@ func _expect_game() -> void:
 		_expect(current_scene.model.possessions == 0 and not current_scene.model.bridge_open, "The game must start with fresh puzzle state")
 
 func _run() -> void:
-	_expect(ProjectSettings.get_setting("application/run/main_scene") == "res://studio/phicid_splash.tscn", "Normal project startup must enter the studio splash")
+	_expect(ProjectSettings.get_setting("application/run/main_scene") == "res://game/startup.tscn", "Normal project startup must enter the game's configured studio splash")
+	var shared_splash = SharedSplashScene.instantiate()
+	_expect(shared_splash.next_scene_path.is_empty(), "The reusable splash must not name a Spiritbound scene")
+	shared_splash.free()
 	var splash = await _open_splash()
 	var logo: TextureRect = splash.get_node("Logo")
 	_expect(splash.get_node("Black").color == Color.BLACK, "Splash backdrop must be opaque black")
@@ -103,6 +107,13 @@ func _run() -> void:
 	_expect(current_scene.get_node_or_null("PhicidSplash") == null, "Splash must be removed completely after transition")
 	current_scene.reset_room()
 	_expect(current_scene.scene_file_path == "res://game/main.tscn", "Puzzle reset must not replay the studio splash")
+
+	# Another game's opening scene must work without changing the shared files.
+	splash = await _open_splash()
+	splash.next_scene_path = "res://tests/splash_destination.tscn"
+	splash._finish()
+	await scene_changed
+	_expect(current_scene.scene_file_path == "res://tests/splash_destination.tscn", "The shared splash must enter any configured destination scene")
 
 	if failures.is_empty():
 		print("Phicid startup splash checks passed: %d" % checks)

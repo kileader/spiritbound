@@ -50,7 +50,7 @@ A nearby animal focuses for 0.23 seconds. An early possession press is buffered,
 
 ## Reuse the studio splash
 
-Copy `studio/` into another Godot 4 project, set `studio/phicid_splash.tscn` as its main scene, and change **Next Scene Path** on the root node to that game's opening scene. Fade and hold durations are editable on the same node. The splash script has no Spiritbound dependency, autoload, sound, or input-map requirement. The supplied logo is preserved unchanged; aspect-preserving scaling and mipmap filtering keep it centered and clean at different window sizes.
+The shared `studio/` folder has no Spiritbound dependency. Each game supplies a small inherited startup scene with its own destination; Spiritbound uses `game/startup.tscn`. See [the Phicid splash reuse guide](studio/README.md) for the files to copy, Godot setup, and equivalent behavior in another engine.
 
 ## Room solution
 

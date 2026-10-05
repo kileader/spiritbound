@@ -1,5 +1,5 @@
 extends Control
-## Copy studio/ into another Godot game and set this scene's next_scene_path.
+## Shared Phicid Productions splash. See studio/README.md for integration.
 
 @export_file("*.tscn") var next_scene_path: String
 @export_range(0.0, 3.0, 0.05) var fade_in_seconds := 0.45
