@@ -1,8 +1,12 @@
 # Spiritbound
 
+[Play in your browser](https://kileader.github.io/spiritbound/)
+
 A calm, single-room possession puzzle in Godot. An unexplained spirit moves through ordinary animals in a beautiful, reclaimed natural world. This prototype tests whether moving between bodies feels good, and whether their return behaviours make positioning interesting.
 
 One Mouse, one Bird, one Bear, one exit. No combat, hazards, health, progression, menus, or world framework.
+
+Development is paused at this playable prototype. Further changes can wait for a later playtest.
 
 ## Run
 
@@ -82,6 +86,8 @@ npm run serve
 ```
 
 Windows output is `builds/windows/Spiritbound.exe` plus its neighbouring `.pck`. Web output is `builds/web/`, served at [http://127.0.0.1:5173](http://127.0.0.1:5173). Builds, engine binaries, and generated editor state are ignored. After code changes, restart the native game or refresh a newly exported web build.
+
+GitHub Pages hosts the browser build at [kileader.github.io/spiritbound](https://kileader.github.io/spiritbound/). `.github/workflows/pages.yml` uses Godot 4.7.2 to import, run the headless checks, export, and publish on each push to `main`; it can also be run manually from GitHub Actions. No generated build files need to be committed. The web export is single-threaded and uses the Compatibility renderer, so it does not require special cross-origin isolation headers. Use a browser with WebGL 2 support and a keyboard or gamepad; touch controls are outside this prototype.
 
 ## Smallest playtest
 
