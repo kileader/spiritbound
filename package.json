@@ -1,0 +1,12 @@
+{
+  "name": "spiritbound",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A single-room possession puzzle prototype.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test src/*.test.js",
+    "check": "node --check src/model.js && node --check src/main.js && node --check src/render.js && node --check server.js"
+  }
+}

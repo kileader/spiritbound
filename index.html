@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#141b2b" />
+    <title>Spiritbound — possession prototype</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="prototype">
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">First playable · one room</p>
+          <h1>Spiritbound</h1>
+          <p class="intro">Borrow a body. Leave it somewhere useful.</p>
+        </div>
+        <div class="header-actions">
+          <span id="controller-status" class="controller-status">Connect a controller, then press a button</span>
+          <button id="debug-toggle" class="button secondary" type="button" aria-pressed="true">Indicators: on</button>
+          <button id="reset" class="button" type="button">Reset <kbd>Y</kbd></button>
+        </div>
+      </header>
+
+      <section class="play-area" aria-label="Spiritbound puzzle room">
+        <div class="game-heading">
+          <p id="status" class="status" aria-live="polite">You are the Mouse</p>
+          <p class="destination">Destination <span>✦</span> far bank burrow</p>
+        </div>
+        <canvas id="game" width="1100" height="700" tabindex="0" aria-label="Top-down possession puzzle. Move with the left stick or WASD. Release and possess with A or Space."></canvas>
+        <div class="hint-row">
+          <span class="hint-icon" aria-hidden="true">◇</span>
+          <p id="hint">Start as the Mouse. Find the narrow gap.</p>
+        </div>
+        <div id="result" class="result" hidden aria-live="polite"></div>
+      </section>
+
+      <footer class="play-footer">
+        <div class="controls">
+          <p class="footer-label">Controls</p>
+          <p><kbd>Left stick</kbd> move <span>·</span> <kbd>A</kbd> release / possess <span>·</span> <kbd>LB / RB</kbd> select host <span>·</span> <kbd>Y</kbd> reset</p>
+          <p class="keyboard"><kbd>WASD / arrows</kbd> move <span>·</span> <kbd>Space</kbd> release / possess <span>·</span> <kbd>Q / E</kbd> select <span>·</span> <kbd>R</kbd> reset</p>
+        </div>
+        <div class="objectives">
+          <p class="footer-label">Room goals</p>
+          <ul id="objective-list"></ul>
+        </div>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
