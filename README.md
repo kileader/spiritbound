@@ -8,6 +8,8 @@ One Mouse, one Bird, one Bear, one exit. No combat, hazards, health, progression
 
 Use **Godot 4.7.2 Standard**, with the Compatibility renderer. Import `project.godot` in the editor and press **F5**. There are no external game dependencies.
 
+Startup shows the Phicid Productions logo on black: a 0.45-second fade in, a 1.5-second hold, and a 0.45-second fade out. Click, press any keyboard key, or press a gamepad button to skip. Puzzle reset stays inside the game.
+
 On Windows, the optional PowerShell wrapper accepts an installed or portable engine:
 
 ```powershell
@@ -25,6 +27,7 @@ The equivalent portable engine commands are:
 godot --path .
 godot --headless --path . --script tests/run_room.gd
 godot --headless --path . --script tests/run_animation.gd
+godot --headless --path . --script tests/run_splash.gd
 godot --headless --path . --editor --import --quit
 ```
 
@@ -40,6 +43,10 @@ godot --headless --path . --editor --import --quit
 | Show debug ranges and animal states | Back / Select | F1 |
 
 A nearby animal focuses for 0.23 seconds. An early possession press is buffered, so transfer does not require precise timing. Valid, focused possession always succeeds. While disembodied, B / Escape immediately reclaims the animal you last released at its current position, even if it has returned beyond the tether. This cancels any pending transfer.
+
+## Reuse the studio splash
+
+Copy `studio/` into another Godot 4 project, set `studio/phicid_splash.tscn` as its main scene, and change **Next Scene Path** on the root node to that game's opening scene. Fade and hold durations are editable on the same node. The splash script has no Spiritbound dependency, autoload, sound, or input-map requirement. The supplied logo is preserved unchanged; aspect-preserving scaling and mipmap filtering keep it centered and clean at different window sizes.
 
 ## Room solution
 
@@ -64,7 +71,7 @@ The original JavaScript prototype is preserved in Git history. Godot replaces it
 
 ## Checks and exports
 
-Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness or physical controller feel; those require playing the build.
+Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Startup checks cover splash timing, keyboard/click/gamepad skips, and fresh gameplay without leaking the skip press. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness or physical controller feel; those require playing the build.
 
 Install matching Godot export templates to create builds:
 

@@ -3,7 +3,9 @@ config_version=5
 
 [application]
 config/name="Spiritbound"
-run/main_scene="res://game/main.tscn"
+run/main_scene="res://studio/phicid_splash.tscn"
+boot_splash/show_image=false
+boot_splash/bg_color=Color(0, 0, 0, 1)
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/description="A spirit moves through ordinary animals in a reclaimed woodland."
 
@@ -21,5 +23,5 @@ common/physics_jitter_fix=0.0
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-environment/defaults/default_clear_color=Color(0.035, 0.058, 0.06, 1)
+environment/defaults/default_clear_color=Color(0, 0, 0, 1)
 textures/default_filters/use_nearest_mipmap_filter=false
