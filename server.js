@@ -3,16 +3,17 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-const root = fileURLToPath(new URL('.', import.meta.url));
+// Only exported files are served. Godot owns the game; Node is optional preview tooling.
+const root = fileURLToPath(new URL('./builds/web/', import.meta.url));
 const port = Number(process.env.PORT || 5173);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm', '.pck': 'application/octet-stream', '.png': 'image/png', '.svg': 'image/svg+xml' };
 
 http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     const relative = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
     const file = path.resolve(root, relative);
-    if (!file.startsWith(root) || !['.html', '.js', '.css', '.json'].includes(path.extname(file))) {
+    if (!file.startsWith(root) || !Object.hasOwn(types, path.extname(file))) {
       res.writeHead(404).end('Not found');
       return;
     }
@@ -22,4 +23,4 @@ http.createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('Not found');
   }
-}).listen(port, '127.0.0.1', () => console.log(`Spiritbound is ready at http://127.0.0.1:${port}`));
+}).listen(port, '127.0.0.1', () => console.log(`Godot web export is ready at http://127.0.0.1:${port}`));

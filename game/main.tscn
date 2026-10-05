@@ -1,0 +1,31 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://game/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://game/room_art.gd" id="2_art"]
+[ext_resource type="Script" path="res://game/room_feedback.gd" id="3_fx"]
+[ext_resource type="Script" path="res://game/animal_view.gd" id="4_animal"]
+
+[node name="Spiritbound" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="ReclaimedClearing" type="Node2D" parent="."]
+script = ExtResource("2_art")
+
+[node name="Mouse" type="Node2D" parent="."]
+script = ExtResource("4_animal")
+animal_id = "mouse"
+
+[node name="Bear" type="Node2D" parent="."]
+script = ExtResource("4_animal")
+animal_id = "bear"
+
+[node name="Bird" type="Node2D" parent="."]
+script = ExtResource("4_animal")
+animal_id = "bird"
+
+[node name="Spirit" type="Node2D" parent="."]
+script = ExtResource("4_animal")
+animal_id = "spirit"
+
+[node name="Possession" type="Node2D" parent="."]
+script = ExtResource("3_fx")

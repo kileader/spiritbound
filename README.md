@@ -1,72 +1,86 @@
 # Spiritbound
 
-A calm, single-room possession puzzle prototype. The question is simple: **does moving between animal bodies feel good, especially when a released animal starts heading home?**
+A calm, single-room possession puzzle in Godot. An unexplained spirit moves through ordinary animals in a beautiful, reclaimed natural world. This prototype tests whether moving between bodies feels good, and whether their return behaviours make positioning interesting.
 
-You begin inside a Mouse. Reach the far bank's covered burrow by borrowing a Bird and a Bear, then bringing the Mouse across. Placeholder shapes, range rings, return indicators, and immediate reset make this a small playtest rather than a broader game.
+One Mouse, one Bird, one Bear, one exit. No combat, hazards, health, progression, menus, or world framework.
 
 ## Run
 
-Requires Node.js 18 or newer. There are no package or runtime dependencies to install.
+Use **Godot 4.7.2 Standard**, with the Compatibility renderer. Import `project.godot` in the editor and press **F5**. There are no external game dependencies.
+
+On Windows, the optional PowerShell wrapper accepts an installed or portable engine:
 
 ```powershell
+$env:SPIRITBOUND_GODOT = 'C:\path\to\Godot_v4.7.2-stable_win64_console.exe'
 npm start
-```
-
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173). Connect a controller and press any button so the browser can detect it. The game starts immediately; there is no menu.
-
-```powershell
 npm test
 npm run check
 ```
 
-The first command runs the behavior tests. The second checks JavaScript syntax. The complete solution is exercised with movement, possession, and waits for returning animals. Browser release, re-possession, reset, and rendering have also been checked. A physical controller still needs its own playtest.
+It also discovers `godot` / `godot4` on PATH, or the ignored local `.tools/godot/` binary. Node/npm only provides convenience commands and an optional web preview server; gameplay is GDScript.
+
+The equivalent portable engine commands are:
+
+```text
+godot --path .
+godot --headless --path . --script tests/run_room.gd
+godot --headless --path . --script tests/run_animation.gd
+godot --headless --path . --editor --import --quit
+```
 
 ## Controls
 
-| Action | Standard gamepad | Keyboard |
+| Action | Gamepad | Keyboard |
 | --- | --- | --- |
-| Move | Left stick or D-pad | WASD or arrow keys |
-| Release body / possess selected host | A | Space |
-| Select another nearby host | LB / RB | Q / E |
-| Reset the entire puzzle | Y | R |
+| Move | Left stick / D-pad | WASD / arrows |
+| Release / possess selected animal | A | Space |
+| Choose another nearby animal | LB / RB | Q / E |
+| Reset puzzle immediately | Y | R |
+| Show debug ranges and animal states | Back / Select | F1 |
 
-The on-screen Reset button also resets instantly. The Indicators button hides optional state and return annotations; the spirit tether and target highlights remain available while disembodied.
-
-Press A or Space once to leave a body, then again to possess the selected nearby animal. A target briefly focuses for 0.23 seconds. An early possession press is buffered until focus completes, so you do not need to time the press precisely. Valid possession always succeeds.
+A nearby animal focuses for 0.23 seconds. An early possession press is buffered, so transfer does not require precise timing. Valid, focused possession always succeeds.
 
 ## Room solution
 
-1. **Mouse → Bird:** Move the Mouse through the narrow opening in the first wall, then toward the Bird feeding at the water's west edge. Release the Mouse and possess the Bird. The Mouse starts returning to its burrow.
-2. **Bird → Bear:** Fly across the water and stop near the Bear's food spot. Release the Bird and possess the Bear. The Bird returns to the nearest marked perch, here the east perch.
-3. **Make a crossing:** Walk the Bear to the slab's right side and push left. The slab settles into the water, opening a narrow crossing that the Mouse can use.
-4. **Bear → Bird → Mouse:** Return the Bear near the east perch and switch into the Bird. Fly back toward the Mouse's burrow, release the Bird nearby, and possess the Mouse. The Bird heads to the west perch, which is close enough to the burrow for a calm transfer even after both animals finish returning.
-5. **Mouse → exit:** Use the first wall's narrow opening again, cross the slab bridge, then use the final small opening to reach the glowing exit inside the covered burrow.
+1. Move the Mouse through the root slit toward the Bird foraging on the west bank. Release and enter the Bird; the Mouse returns to its burrow.
+2. Fly across the stream to the Bear. Release and enter the Bear; the Bird returns to the east perch.
+3. Walk the Bear behind the fallen trunk and push left until it tears loose and settles into the stream.
+4. Bring the Bear near the east perch, release, and reclaim the Bird. Fly back to the west perch and reclaim the Mouse near its burrow. Released animals can finish returning before either transfer.
+5. Take the Mouse through the root slit, through the hollow trunk, and through the final root opening to the glowing exit.
 
-The first wall's opening is centered at y=417, the slab crossing at y=467, and the final opening at y=572. The Mouse gently centers when approached horizontally near these openings, so navigation does not depend on precise alignment.
+The spirit's movement radius is **115 units from its fixed release point**. The animal can walk away without dragging that tether. Possession reaches another 72 units from the spirit. Release positions and the Bird's choice of the nearer perch are part of the puzzle. Reset is always available if every host leaves reach.
 
-The Bird's east perch is an intentionally useful host for getting back after the Bear pushes the slab. Its west perch makes reaching the returning Mouse possible. The player's short spirit range makes these release positions part of the puzzle.
+## Implementation and assumptions
 
-## Prototype rules and assumptions
+- `game/room_model.gd` owns explicit room geometry, movement, collision, focus, possession, and animal returns. Mouse gaps gently guide horizontal movement; the Bear cannot fit through the trunk crossing, and the Bird cannot enter the covered exit.
+- `game/animal_view.gd` draws ordinary animals with scurrying feet, folding wings, banking flight, weight shifts, breathing, and quiet idle motions. Their visual poses do not change collision geometry.
+- `game/room_art.gd` illustrates roots, reclaimed masonry, stream, burrow, perches, food, and hollow trunk. The artwork is procedural placeholder art rather than finished production assets.
+- `game/room_feedback.gd` draws the fixed tether, focused hosts, and possession effects. `game/main.gd` handles native gamepad input, minimal HUD, particles, vibration, and small synthesized sound cues.
+- Rules run at 60 ticks per second. Visual positions, facing, gait, and effects interpolate between ticks; pose changes ease continuously. Static scenery retains drawing commands to reduce per-frame work.
+- There are no bugs in this room. The Mouse starts possessed, and the Bird starts foraging before returning to a perch on release.
 
-- The room contains exactly one Mouse, one Bird, and one Bear. There are no bugs in this room.
-- The spirit can move up to 115 room units from the animal it exited. That tether follows the animal as it moves. Possession reaches another 72 units from the spirit.
-- The Mouse returns to its burrow; the Bird returns to the nearer of its two perches; the Bear returns toward its food spot. Return speeds are deliberately slow. There are no hazards, death, or failure rolls.
-- The Mouse fits the narrow passages and slab crossing. The Bird flies across water and ordinary walls, but cannot enter the covered exit burrow. Only the Bear can push the slab.
-- Returning animals can be possessed again. Their home locations stay visible, and return destinations and animal states are shown with indicators enabled.
-- The initial Mouse is already possessed so the first action is movement. The Bird begins at a feeding spot rather than on a perch.
-- Controls assume the browser's standard gamepad mapping, with Xbox-style labels. Actual controller hardware behavior remains to be verified.
-- This is a plain JavaScript Canvas game with a small Node static server. `src/model.js` owns room rules, `src/main.js` owns input and the frame loop, and `src/render.js` draws the room.
+The original JavaScript prototype is preserved in Git history. Godot replaces its runtime to make further movement, animation, and art iteration practical.
 
-There is no progression, inventory, combat, lore system, menu, save system, or generalized world infrastructure.
+## Checks and exports
 
-## First playtest
+Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness or physical controller feel; those require playing the build.
 
-Check only the smallest questions needed to decide whether the core is promising:
+Install matching Godot export templates to create builds:
 
-- **Transfer feel:** Is release → brief focus → possession readable and satisfying? Does A / Space do what the player expects?
-- **Animal positioning:** Does the player notice that the Bird returns to a perch, and intentionally use that perch for the return trip?
-- **Planning over timing:** Can the full route be solved calmly, including when animals finish returning before the next transfer?
-- **Movement and clarity:** Do the Mouse openings, Bear push, spirit tether, valid targets, and covered exit communicate their rules without explanation?
-- **Controller and reset:** Test a physical gamepad's stick deadzone, button mapping, target cycling, and immediate Y reset.
+```powershell
+npm run export:windows
+npm run export:web
+npm run serve
+```
 
-Avoid adding systems before these answers are clear. The next useful change should address a specific confusing or unsatisfying moment observed in this room.
+Windows output is `builds/windows/Spiritbound.exe` plus its neighbouring `.pck`. Web output is `builds/web/`, served at [http://127.0.0.1:5173](http://127.0.0.1:5173). Builds, engine binaries, and generated editor state are ignored. After code changes, restart the native game or refresh a newly exported web build.
+
+## Smallest playtest
+
+- Do Mouse starts and turns feel nimble, Bird flight feel fluid, and Bear movement feel heavy without becoming sluggish?
+- Do takeoff, stopping, pushing, release, and possession flow without visible pose pops?
+- Does the Bird's return to a perch invite deliberate positioning, while the full route remains calm after animals settle?
+- Can a player read the slit, hollow trunk, exit, valid hosts, and fixed tether with debug labels off?
+- Does a physical gamepad feel responsive, including focus buffering and immediate reset?
+
+The next change should address a specific moment observed in this room.
