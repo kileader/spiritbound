@@ -23,6 +23,7 @@ func _run() -> void:
 	game = room.model
 	_disable_automatic_steps(room)
 	_watch_draws(room)
+	await _test_return_input_and_status()
 	for rate in [30, 60, 144]:
 		await _exercise_rate(rate)
 	await process_frame
@@ -46,6 +47,38 @@ func _expect(condition: bool, message: String) -> bool:
 	if not condition:
 		failures.append(message)
 	return condition
+
+
+func _test_return_input_and_status() -> void:
+	var keyboard_bound := false
+	var gamepad_bound := false
+	for event in InputMap.action_get_events("return_host"):
+		if event is InputEventKey:
+			keyboard_bound = keyboard_bound or event.physical_keycode == KEY_ESCAPE
+		elif event is InputEventJoypadButton:
+			gamepad_bound = gamepad_bound or event.button_index == JOY_BUTTON_B
+	_expect(keyboard_bound and gamepad_bound, "Return must be bound to Escape and gamepad B")
+	game.release()
+	room._refresh_status()
+	_expect(room.status_label.text == "Spirit: Mouse", "The selected host status must use readable text instead of the missing arrow glyph")
+	_expect(room.return_label.text == "B / Esc  return to Mouse", "The HUD must identify the animal that return will reclaim")
+	var glyphs_supported := true
+	for label in [room.status_label, room.return_label]:
+		var font: Font = label.get_theme_font("font")
+		for index in label.text.length():
+			glyphs_supported = glyphs_supported and font.has_char(label.text.unicode_at(index))
+	_expect(glyphs_supported, "The HUD font must contain every character used by the spirit status and return hint")
+	game.animal_by_id("mouse").position = Vector2(240, 542)
+	Input.action_press("return_host")
+	# Godot exposes just-pressed actions on the next input frame, as it does
+	# during normal play. A same-frame manual callback skips that boundary.
+	await process_frame
+	room._physics_process(DT)
+	Input.action_release("return_host")
+	_process_views(0.0)
+	_expect(game.mode == "animal" and game.active_id == "mouse" and not room.get_node("Spirit").visible, "The return input must reclaim the body and hide the spirit in the actual scene")
+	_expect(room.status_label.text == "Mouse", "Return input must update the HUD to the controlled animal")
+	room.reset_room()
 
 
 func _disable_automatic_steps(node: Node) -> void:

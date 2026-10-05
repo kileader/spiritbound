@@ -302,19 +302,34 @@ func possess() -> bool:
 		return false
 	for animal in valid_targets():
 		if animal.id == target_id:
-			_effect("dive", animal.position, spirit_position, animal.id)
-			animal.state = "controlled"
-			animal.visited = true
-			animal.velocity = Vector2.ZERO
-			active_id = animal.id
-			mode = "animal"
-			target_id = ""
-			focus = 0.0
-			pending_possession = false
-			manual_target = false
-			possessions += 1
+			_enter_animal(animal)
 			return true
 	return false
+
+func return_to_host() -> bool:
+	# Cancel spirit exploration by reclaiming the body actually released.
+	# Its current position can be beyond the fixed tether or target range.
+	if mode != "spirit":
+		return false
+	var animal := animal_by_id(anchor_id)
+	if animal.is_empty() or animal.id == "bug":
+		return false
+	_enter_animal(animal)
+	return true
+
+func _enter_animal(animal: Dictionary) -> void:
+	_effect("dive", animal.position, spirit_position, animal.id)
+	animal.state = "controlled"
+	animal.visited = true
+	animal.velocity = Vector2.ZERO
+	active_id = animal.id
+	mode = "animal"
+	target_id = ""
+	focus = 0.0
+	pending_possession = false
+	manual_target = false
+	trail.clear()
+	possessions += 1
 
 func _effect(kind: String, at: Vector2, from: Vector2 = Vector2.ZERO, host_id: String = "") -> void:
 	event_serial += 1
@@ -337,7 +352,7 @@ func _update_poses(dt: float, previous: Array[Vector2]) -> void:
 			var stride := 17.0 if animal.id == "mouse" else 70.0 if animal.id == "bird" else 65.0
 			animal.gait += motion.length() / stride * TAU
 
-func step(dt: float, input_direction: Vector2 = Vector2.ZERO, action: bool = false, cycle: int = 0) -> void:
+func step(dt: float, input_direction: Vector2 = Vector2.ZERO, action: bool = false, cycle: int = 0, recall: bool = false) -> void:
 	dt = clampf(dt, 0.0, 0.05)
 	_capture_render_state()
 	_render_step = dt
@@ -353,6 +368,11 @@ func step(dt: float, input_direction: Vector2 = Vector2.ZERO, action: bool = fal
 		previous.append(animal.position)
 		animal.pushing = false
 	if mode == "won":
+		_update_poses(dt, previous)
+		return
+	if recall and return_to_host():
+		# Return wins over a simultaneous possession press or buffered transfer.
+		_return_home(dt)
 		_update_poses(dt, previous)
 		return
 	var was_spirit := mode == "spirit"

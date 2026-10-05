@@ -34,11 +34,12 @@ godot --headless --path . --editor --import --quit
 | --- | --- | --- |
 | Move | Left stick / D-pad | WASD / arrows |
 | Release / possess selected animal | A | Space |
+| Return to the animal last released | B | Escape |
 | Choose another nearby animal | LB / RB | Q / E |
 | Reset puzzle immediately | Y | R |
 | Show debug ranges and animal states | Back / Select | F1 |
 
-A nearby animal focuses for 0.23 seconds. An early possession press is buffered, so transfer does not require precise timing. Valid, focused possession always succeeds.
+A nearby animal focuses for 0.23 seconds. An early possession press is buffered, so transfer does not require precise timing. Valid, focused possession always succeeds. While disembodied, B / Escape immediately reclaims the animal you last released at its current position, even if it has returned beyond the tether. This cancels any pending transfer.
 
 ## Room solution
 
@@ -48,7 +49,7 @@ A nearby animal focuses for 0.23 seconds. An early possession press is buffered,
 4. Bring the Bear near the east perch, release, and reclaim the Bird. Fly back to the west perch and reclaim the Mouse near its burrow. Released animals can finish returning before either transfer.
 5. Take the Mouse through the root slit, through the hollow trunk, and through the final root opening to the glowing exit.
 
-The spirit's movement radius is **115 units from its fixed release point**. The animal can walk away without dragging that tether. Possession reaches another 72 units from the spirit. Release positions and the Bird's choice of the nearer perch are part of the puzzle. Reset is always available if every host leaves reach.
+The spirit's movement radius is **115 units from its fixed release point**. The animal can walk away without dragging that tether. Possession reaches another 72 units from the spirit. Release positions and the Bird's choice of the nearer perch are part of the puzzle. B / Escape provides a way back to the released body if every host leaves reach; Y / R still resets the whole puzzle.
 
 ## Implementation and assumptions
 

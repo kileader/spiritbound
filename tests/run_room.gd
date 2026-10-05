@@ -13,6 +13,7 @@ func _initialize() -> void:
 	_test_fixed_release_origin()
 	_test_idle_bounds()
 	_test_fresh_release_and_reset()
+	_test_return_to_released_host()
 	_test_trunk_and_exit_constraints()
 	_test_complete_possession_chain()
 	_test_rendered_movement()
@@ -207,6 +208,56 @@ func _test_idle_bounds() -> void:
 	_expect(not game.bridge_open and game.block == Rect2(688, 431, 132, 72), "Idle animation must not alter environmental geometry")
 	_expect(game.effects.is_empty(), "Completed transition effects must expire during a long idle")
 	_expect(game.trail.size() <= 60, "The idle spirit trail must remain bounded to less than a second of history")
+
+
+func _test_return_to_released_host() -> void:
+	var game = Model.new()
+	_expect(not game.return_to_host(), "Return must do nothing while already controlling an animal")
+	if not _reach_first_bird(game):
+		return
+	game.release()
+	var origin: Vector2 = game.spirit_origin
+	_tick(game, 700)
+	var mouse: Dictionary = game.animal_by_id("mouse")
+	var home_position: Vector2 = mouse.position
+	var spirit_before: Vector2 = game.spirit_position
+	_expect(not _target_present(game, "mouse") and home_position.distance_to(origin) > game.spirit_range, "The return fixture must put the released body beyond both targeting and tether range")
+	game.bridge_open = true
+	game.block.position.x = game.bridge.position.x
+	var block_before: Rect2 = game.block
+	_expect(game.return_to_host(), "Return must reclaim the released host without range or focus requirements")
+	_expect(game.mode == "animal" and game.active_id == "mouse" and mouse.state == "controlled", "Return must restore direct control of the released Mouse")
+	_expect(mouse.position == home_position and mouse.velocity == Vector2.ZERO, "Return must use the body's current position without teleporting or sliding it")
+	_expect(game.bridge_open and game.block == block_before and not game.animal_by_id("bird").visited and not game.animal_by_id("bear").visited, "Return must preserve the room and avoid marking unrelated hosts as possessed")
+	_expect(game.target_id.is_empty() and game.focus == 0 and not game.pending_possession and not game.manual_target and game.trail.is_empty(), "Return must clear targeting, buffered actions and spirit history")
+	var dive: Dictionary = game.effects[-1]
+	_expect(dive.kind == "dive" and dive.host_id == "mouse" and dive.from == spirit_before and dive.position == home_position, "Return must animate a dive from the spirit to its actual released host")
+	var count: int = game.possessions
+	_expect(not game.return_to_host() and game.possessions == count, "Repeated return presses must not create extra possession events")
+	game.release()
+	_expect(game.spirit_origin == home_position and game.spirit_position == home_position, "Release after return must establish a fresh fixed origin at the reclaimed body")
+	game.reset()
+	game.step(DT, Vector2.ZERO, false, 0, true)
+	_expect(game.mode == "animal" and game.active_id == "mouse" and game.possessions == 0 and game.effects.is_empty(), "Reset must prevent a return from reclaiming any stale host")
+
+	game = Model.new()
+	if not _reach_first_bird(game):
+		return
+	game.release()
+	game.target_id = "bird"
+	game.focus = 1.0
+	game.pending_possession = true
+	game.step(DT, Vector2.RIGHT, true, 1, true)
+	_expect(game.active_id == "mouse" and game.mode == "animal" and game.possessions == 1, "Return must beat a simultaneous action, target cycle and buffered transfer to another animal")
+
+	for id in ["bird", "bear"]:
+		game = Model.new()
+		var animal := _select_animal(game, id, Vector2(800, 245))
+		game.release()
+		_tick(game, 30)
+		var current: Vector2 = animal.position
+		game.step(DT, Vector2.ZERO, false, 0, true)
+		_expect(game.mode == "animal" and game.active_id == id and animal.state == "controlled" and animal.position == current, "Return must reclaim the moving %s at its current position" % id)
 
 
 func _test_trunk_and_exit_constraints() -> void:

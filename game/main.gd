@@ -5,6 +5,7 @@ var model = RoomModel.new()
 var debug := false
 var status_label: Label
 var controller_label: Label
+var return_label: Label
 var last_effect := 0
 var sound_player: AudioStreamPlayer
 var sound_cues: Dictionary = {}
@@ -29,6 +30,7 @@ func _setup_input() -> void:
 	_bind("move_up", [KEY_W, KEY_UP], JOY_BUTTON_DPAD_UP, JOY_AXIS_LEFT_Y, -1.0)
 	_bind("move_down", [KEY_S, KEY_DOWN], JOY_BUTTON_DPAD_DOWN, JOY_AXIS_LEFT_Y, 1.0)
 	_bind("possess", [KEY_SPACE], JOY_BUTTON_A)
+	_bind("return_host", [KEY_ESCAPE], JOY_BUTTON_B)
 	_bind("reset_room", [KEY_R], JOY_BUTTON_Y)
 	_bind("target_previous", [KEY_Q], JOY_BUTTON_LEFT_SHOULDER)
 	_bind("target_next", [KEY_E], JOY_BUTTON_RIGHT_SHOULDER)
@@ -59,7 +61,7 @@ func _physics_process(dt: float) -> void:
 		_toggle_debug()
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down", 0.18)
 	var cycle := int(Input.is_action_just_pressed("target_next")) - int(Input.is_action_just_pressed("target_previous"))
-	model.step(dt, direction, Input.is_action_just_pressed("possess"), cycle)
+	model.step(dt, direction, Input.is_action_just_pressed("possess"), cycle, Input.is_action_just_pressed("return_host"))
 	_present_feedback()
 	_refresh_status()
 
@@ -104,6 +106,11 @@ func _build_hud() -> void:
 	controller_label.add_theme_color_override("font_color", Color("728e84"))
 	controller_label.add_theme_font_size_override("font_size", 10)
 	bar.add_child(controller_label)
+	return_label = Label.new()
+	return_label.position = Vector2(275, 37)
+	return_label.add_theme_color_override("font_color", Color("a4b8ad"))
+	return_label.add_theme_font_size_override("font_size", 11)
+	bar.add_child(return_label)
 	var inspect := Button.new()
 	inspect.position = Vector2(955, 12)
 	inspect.size = Vector2(122, 32)
@@ -123,9 +130,11 @@ func _refresh_status() -> void:
 	if model.mode == "won":
 		status_label.text = "Home reached"
 	elif model.mode == "spirit":
-		status_label.text = "Spirit" if model.target_id.is_empty() else "Spirit → " + model.animal_by_id(model.target_id).name
+		status_label.text = "Spirit" if model.target_id.is_empty() else "Spirit: " + model.animal_by_id(model.target_id).name
 	else:
 		status_label.text = model.animal_by_id(model.active_id).name
+	if return_label:
+		return_label.text = "B / Esc  return to " + model.animal_by_id(model.anchor_id).name if model.mode == "spirit" else "B / Esc  return after release"
 
 func _present_feedback() -> void:
 	for effect in model.effects:
