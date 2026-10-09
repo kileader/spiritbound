@@ -33,6 +33,11 @@ func _run() -> void:
 	_test_movement_cues()
 	await _test_settings_input()
 	_test_saved_settings()
+	# Let the player process the mixer's stopped playbacks before deleting it.
+	# Seeking the looping WAV creates several playback references in headless runs.
+	audio.bgm_player.stop()
+	audio.stop_sfx()
+	await create_timer(0.2).timeout
 	room.queue_free()
 	await create_timer(0.1).timeout
 	if FileAccess.file_exists(TEST_SETTINGS):
