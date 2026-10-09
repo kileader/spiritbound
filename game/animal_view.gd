@@ -17,12 +17,53 @@ var _rest_blend: float = 0.0
 var _turn_blend: float = 0.0
 var _flight_blend: float = 0.0
 var _wing_phase: float = 0.0
+const StrokeMesh = preload("res://game/stroke_mesh.gd")
+var _strokes: Array = []
+var _stroke_index: int = 0
+var _lines: Array = []
+var _line_index: int = 0
+var _preparing: bool = false
 
 func _ready() -> void:
 	if Engine.is_editor_hint() and model == null:
 		model = preload("res://game/room_model.gd").new()
+	if animal_id == "spirit":
+		# Allocate the spirit's meshes during room startup, while the splash is
+		# handing over. Its first appearance should only update existing buffers.
+		_preparing = true
+		_draw_spirit()
+		_preparing = false
 
 const TAU_F: float = PI * 2.0
+static var _unit_circle := _make_unit_circle()
+static var _circle_mesh := _make_circle_mesh()
+static var _curve_weights := _make_curve_weights()
+
+static func _make_unit_circle() -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in 40:
+		points.append(Vector2.from_angle(TAU_F * float(index) / 40.0))
+	return points
+
+static func _make_circle_mesh() -> ArrayMesh:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([Vector2.ZERO]) + _unit_circle
+	var indices := PackedInt32Array()
+	for index in _unit_circle.size():
+		indices.append_array(PackedInt32Array([0, index + 1, (index + 1) % _unit_circle.size() + 1]))
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_FLAG_USE_2D_VERTICES)
+	return mesh
+
+static func _make_curve_weights() -> PackedVector4Array:
+	var weights := PackedVector4Array()
+	for index in 21:
+		var t := float(index) / 20.0
+		var inverse := 1.0 - t
+		weights.append(Vector4(inverse * inverse * inverse, 3.0 * inverse * inverse * t, 3.0 * inverse * t * t, t * t * t))
+	return weights
 
 
 func _process(delta: float) -> void:
@@ -72,6 +113,8 @@ func _advance_pose(delta: float) -> void:
 
 
 func _draw() -> void:
+	_stroke_index = 0
+	_line_index = 0
 	if model == null:
 		return
 	if animal_id == "spirit":
@@ -95,32 +138,57 @@ func _draw() -> void:
 
 
 func _oval(center: Vector2, radii: Vector2, color: Color, angle: float = 0.0, edge: Color = Color.TRANSPARENT, width: float = 1.0) -> void:
-	var points := PackedVector2Array()
-	for index in range(40):
-		var theta: float = TAU_F * float(index) / 40.0
-		points.append(center + Vector2(cos(theta) * radii.x, sin(theta) * radii.y).rotated(angle))
-	draw_colored_polygon(points, color)
-	points.append(points[0])
-	draw_polyline(points, color, 0.6, true)
+	# Transform the shared geometry in native code instead of evaluating 40
+	# trigonometric points in GDScript for every body part on every web frame.
+	var points := Transform2D(angle, radii, 0.0, center) * _unit_circle
+	if not _preparing:
+		draw_mesh(_circle_mesh, null, Transform2D(angle, radii, 0.0, center), color)
+	_stroke(points, color, 0.6, true)
 	if edge.a > 0.0:
-		draw_polyline(points, edge, width, true)
+		_stroke(points, edge, width, true)
 
 
 func _shape(points: Array, color: Color, edge: Color = Color.TRANSPARENT, width: float = 1.0) -> void:
 	var packed := PackedVector2Array(points)
 	draw_colored_polygon(packed, color)
-	packed.append(packed[0])
 	if edge.a > 0.0:
-		draw_polyline(packed, edge, width, true)
+		_stroke(packed, edge, width, true)
 
 
 func _curve(start: Vector2, control_a: Vector2, control_b: Vector2, end: Vector2, color: Color, width: float = 1.0) -> void:
 	var points := PackedVector2Array()
-	for index in range(21):
-		var ratio: float = float(index) / 20.0
-		var inverse: float = 1.0 - ratio
-		points.append(start * inverse * inverse * inverse + control_a * 3.0 * inverse * inverse * ratio + control_b * 3.0 * inverse * ratio * ratio + end * ratio * ratio * ratio)
-	draw_polyline(points, color, width, true)
+	for weights in _curve_weights:
+		points.append(start * weights.x + control_a * weights.y + control_b * weights.z + end * weights.w)
+	_stroke(points, color, width)
+
+
+func _stroke(points: PackedVector2Array, color: Color, width: float, closed: bool = false) -> void:
+	if _stroke_index == _strokes.size():
+		_strokes.append(StrokeMesh.new())
+	var stroke = _strokes[_stroke_index]
+	_stroke_index += 1
+	var mesh: ArrayMesh = stroke.update(points, width, closed)
+	if not _preparing:
+		draw_mesh(mesh, null, Transform2D.IDENTITY, Color(color, color.a * minf(1.0, width)))
+
+
+func _line(start: Vector2, end: Vector2, color: Color, width: float) -> void:
+	# Trail length varies, so keep two-point strokes in a separate pool. Growing
+	# a trail must not replace the meshes used for the spirit's body and curves.
+	if _line_index == _lines.size():
+		_lines.append(StrokeMesh.new())
+	var line = _lines[_line_index]
+	_line_index += 1
+	var mesh: ArrayMesh = line.update(PackedVector2Array([start, end]), width)
+	if not _preparing:
+		draw_mesh(mesh, null, Transform2D.IDENTITY, Color(color, color.a * minf(1.0, width)))
+
+
+func _arc(radius: float, start: float, end: float, color: Color, width: float) -> void:
+	var points := PackedVector2Array()
+	for index in 12:
+		points.append(Vector2.from_angle(lerpf(start, end, float(index) / 11.0)) * radius)
+	_stroke(points, color, width)
 
 
 func _shadow(radii: Vector2, height: float = 0.0) -> void:
@@ -171,7 +239,7 @@ func _draw_mouse(_animal: Dictionary, amount: float, gait: float, facing: float,
 	# Short fur strokes read as a back, not a face drawn onto a circle.
 	for index in range(3):
 		var start := Vector2(-7.0 + float(index) * 3.0, -1.8)
-		draw_line(start, start + Vector2(-1.6, 0.7), Color("#9e8c73"), 0.65, true)
+		_line(start, start + Vector2(-1.6, 0.7), Color("#9e8c73"), 0.65)
 
 
 func _draw_bird(_animal: Dictionary, _amount: float, _gait: float, facing: float, time: float) -> void:
@@ -191,15 +259,15 @@ func _draw_bird(_animal: Dictionary, _amount: float, _gait: float, facing: float
 	var teal := Color("#4c8b87")
 	# Three tapering tail feathers trail behind the body.
 	_shape([Vector2(-8.0, -4.0), Vector2(-20.0, -5.8), Vector2(-17.0, -0.6), Vector2(-21.0, 0.0), Vector2(-17.0, 0.6), Vector2(-20.0, 5.8), Vector2(-8.0, 4.0)], teal, ink, 0.7)
-	draw_line(Vector2(-12.0, 0.0), Vector2(-19.0, 0.0), white.darkened(0.15), 1.0, true)
+	_line(Vector2(-12.0, 0.0), Vector2(-19.0, 0.0), white.darkened(0.15), 1.0)
 	for side in [-1.0, 1.0]:
 		# Feet tuck continuously into the silhouette, where the body occludes them.
 		var ankle: Vector2 = Vector2(4.0, side * 9.0).lerp(Vector2(1.0, side * 4.8), flight)
 		var outer_toe: Vector2 = Vector2(7.0, side * 8.4).lerp(Vector2(4.0, side * 4.3), flight)
 		var inner_toe: Vector2 = Vector2(5.5, side * 11.0).lerp(Vector2(3.0, side * 5.3), flight)
-		draw_line(Vector2(1.0, side * 4.0), ankle, Color("#956c43"), 1.3, true)
-		draw_line(ankle, outer_toe, Color("#956c43"), 0.9, true)
-		draw_line(ankle, inner_toe, Color("#956c43"), 0.9, true)
+		_line(Vector2(1.0, side * 4.0), ankle, Color("#956c43"), 1.3)
+		_line(ankle, outer_toe, Color("#956c43"), 0.9)
+		_line(ankle, inner_toe, Color("#956c43"), 0.9)
 	# The wing silhouette expands and contracts in bursts; at rest it folds along the back.
 	for side in [-1.0, 1.0]:
 		var tip: float = side * wing * (1.0 + side * turn * 0.6)
@@ -214,7 +282,7 @@ func _draw_bird(_animal: Dictionary, _amount: float, _gait: float, facing: float
 	var head_x: float = 9.0 + peck * 2.5
 	_oval(Vector2(head_x, 0.0), Vector2(6.7, 5.5 - peck * 0.7), white, 0.0, ink, 0.75)
 	_shape([Vector2(head_x + 4.7, -2.0), Vector2(head_x + 10.0 + peck, 0.0), Vector2(head_x + 4.7, 2.0)], Color("#c6a15b"), Color("#6c6343"), 0.55)
-	draw_line(Vector2(head_x + 5.0, 0.0), Vector2(head_x + 9.0, 0.0), Color("#817143"), 0.6, true)
+	_line(Vector2(head_x + 5.0, 0.0), Vector2(head_x + 9.0, 0.0), Color("#817143"), 0.6)
 	for side in [-1.0, 1.0]:
 		_oval(Vector2(head_x + 2.1, side * 2.5), Vector2(1.05, 0.9), Color("#223d3b"))
 		draw_circle(Vector2(head_x + 2.35, side * 2.45), 0.24, Color("#f7f0d9"))
@@ -242,7 +310,7 @@ func _draw_bear(_animal: Dictionary, amount: float, gait: float, facing: float, 
 		_oval(Vector2(front_x, side * (16.8 + absf(step) * 0.6)), Vector2(9.3, 7.1), fur.darkened(0.15), -side * 0.15, ink, 1.0)
 		for toe in range(3):
 			var toe_y: float = side * 16.8 + float(toe - 1) * 2.5
-			draw_line(Vector2(front_x + 6.3, toe_y), Vector2(front_x + 8.2, toe_y), Color("#c6b58f"), 1.2, true)
+			_line(Vector2(front_x + 6.3, toe_y), Vector2(front_x + 8.2, toe_y), Color("#c6b58f"), 1.2)
 	draw_circle(Vector2(-30.0, 0.0), 3.3, dark)
 	_oval(Vector2(-7.0, 0.0), Vector2(25.5, 21.8), fur, 0.0, ink, 1.3)
 	_oval(Vector2(-10.0, 2.8), Vector2(23.0, 17.0), dark.lightened(0.06))
@@ -255,7 +323,7 @@ func _draw_bear(_animal: Dictionary, amount: float, gait: float, facing: float, 
 	for index in range(7):
 		var offset: float = float(index)
 		var origin := Vector2(-21.0 + offset * 4.6, -5.0 + sin(offset * 1.6) * 5.0)
-		draw_line(origin, origin + Vector2(-2.6, 1.8), Color("#66543f"), 0.9, true)
+		_line(origin, origin + Vector2(-2.6, 1.8), Color("#66543f"), 0.9)
 	var head_x: float = 22.0 + feeding * 1.5 + push * 1.4
 	for side in [-1.0, 1.0]:
 		_oval(Vector2(head_x - 1.5, side * 11.0), Vector2(5.6, 5.1), dark, side * 0.25, ink, 0.9)
@@ -268,13 +336,13 @@ func _draw_bear(_animal: Dictionary, amount: float, gait: float, facing: float, 
 	for side in [-1.0, 1.0]:
 		_oval(Vector2(head_x + 5.6, side * 6.3), Vector2(1.35, 1.0), Color("#292f28"))
 		_curve(Vector2(head_x + 2.0, side * 7.4), Vector2(head_x + 4.0, side * 8.1), Vector2(head_x + 7.0, side * 8.0), Vector2(head_x + 8.0, side * 6.9), Color("#b69a75"), 0.8)
-		draw_line(Vector2(head_x + 2.0, side * 4.7), Vector2(head_x + 7.0, side * 5.4), Color(0.37, 0.31, 0.24, push), 1.2, true)
+		_line(Vector2(head_x + 2.0, side * 4.7), Vector2(head_x + 7.0, side * 5.4), Color(0.37, 0.31, 0.24, push), 1.2)
 
 
 func _draw_spirit() -> void:
 	var time: float = _visual_time
 	var float_y: float = sin(time * 3.0) * 1.5
-	var trail: Array = model.trail
+	var trail: Array = model.trail if model != null else []
 	# Fading ribbons retain the spirit's recent path, without pointing at a moving host.
 	for index in range(1, trail.size()):
 		var age: float = float(trail[index].get("age", 0.0))
@@ -283,12 +351,13 @@ func _draw_spirit() -> void:
 			continue
 		var start: Vector2 = trail[index - 1].position - position
 		var end: Vector2 = trail[index].position - position
-		draw_line(start + Vector2(0.0, float_y), end + Vector2(0.0, float_y), Color(0.40, 0.86, 0.81, opacity * 0.07), 15.0 * opacity, true)
-		draw_line(start + Vector2(0.0, float_y), end + Vector2(0.0, float_y), Color(0.74, 0.97, 0.89, opacity * 0.32), 3.4 * opacity + 0.5, true)
+		_line(start + Vector2(0.0, float_y), end + Vector2(0.0, float_y), Color(0.40, 0.86, 0.81, opacity * 0.07), 15.0 * opacity)
+		_line(start + Vector2(0.0, float_y), end + Vector2(0.0, float_y), Color(0.74, 0.97, 0.89, opacity * 0.32), 3.4 * opacity + 0.5)
 	for ring in range(5):
 		var radius: float = 22.0 - float(ring) * 3.0
 		_oval(Vector2(0.0, float_y), Vector2(radius, radius), Color(0.39, 0.85, 0.78, 0.018 + float(ring) * 0.008))
-	draw_set_transform(Vector2(0.0, float_y))
+	if not _preparing:
+		draw_set_transform(Vector2(0.0, float_y))
 	var twist: float = sin(time * 2.1) * 2.8
 	_curve(Vector2(-5.0, -3.0), Vector2(-15.0 - twist, 0.0), Vector2(-3.0, 19.0), Vector2(-14.0 + twist, 24.0), Color(0.53, 0.93, 0.83, 0.15), 6.0)
 	_curve(Vector2(3.0, -4.0), Vector2(14.0 + twist, 3.0), Vector2(6.0, 16.0), Vector2(14.0 - twist, 19.0), Color(0.67, 0.97, 0.85, 0.33), 2.0)
@@ -299,5 +368,6 @@ func _draw_spirit() -> void:
 	for index in range(3):
 		var theta: float = time * (0.7 + float(index) * 0.13) + float(index) * 2.1
 		var radius: float = 14.0 + float(index) * 1.3
-		draw_arc(Vector2.ZERO, radius, theta, theta + 0.45, 12, Color(0.74, 0.98, 0.86, 0.40 - float(index) * 0.06), 0.9, true)
-	draw_set_transform(Vector2.ZERO)
+		_arc(radius, theta, theta + 0.45, Color(0.74, 0.98, 0.86, 0.40 - float(index) * 0.06), 0.9)
+	if not _preparing:
+		draw_set_transform(Vector2.ZERO)

@@ -3,6 +3,24 @@ extends Node2D
 var model
 var debug := false
 
+func _ready() -> void:
+	if OS.has_feature("web"):
+		# The browser compiles the particle shader on its first rendered use.
+		# Warm it in a tiny undisplayed viewport during startup, before release.
+		var warmup := SubViewport.new()
+		warmup.name = "ParticleWarmup"
+		warmup.size = Vector2i(64, 64)
+		warmup.transparent_bg = true
+		warmup.disable_3d = true
+		warmup.gui_disable_input = true
+		warmup.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		add_child(warmup)
+		var particles := _make_burst("release")
+		particles.position = Vector2(32, 32)
+		particles.preprocess = 0.1
+		warmup.add_child(particles)
+		get_tree().create_timer(0.25).timeout.connect(warmup.queue_free)
+
 func _process(_dt: float) -> void:
 	queue_redraw()
 
@@ -94,27 +112,31 @@ func _draw_debug() -> void:
 		draw_string(font, model.spirit_origin + Vector2(8, -12), "Release point", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("e3e8cb"))
 
 func burst(effect: Dictionary) -> void:
-	var particles := CPUParticles2D.new()
+	var particles := _make_burst(effect.kind)
 	particles.position = effect.position
+	add_child(particles)
+	particles.emitting = true
+	get_tree().create_timer(1.2).timeout.connect(particles.queue_free)
+
+func _make_burst(kind: String) -> CPUParticles2D:
+	var particles := CPUParticles2D.new()
 	particles.one_shot = true
 	particles.explosiveness = 1.0
-	particles.amount = 38 if effect.kind == "crash" else 24
-	particles.lifetime = 0.8 if effect.kind == "crash" else 0.4
+	particles.amount = 38 if kind == "crash" else 24
+	particles.lifetime = 0.8 if kind == "crash" else 0.4
 	particles.direction = Vector2.UP
 	particles.spread = 180
-	particles.gravity = Vector2(0, 95) if effect.kind == "crash" else Vector2.ZERO
+	particles.gravity = Vector2(0, 95) if kind == "crash" else Vector2.ZERO
 	particles.initial_velocity_min = 36
-	particles.initial_velocity_max = 135 if effect.kind == "crash" else 80
+	particles.initial_velocity_max = 135 if kind == "crash" else 80
 	particles.damping_min = 35
 	particles.damping_max = 75
 	particles.scale_amount_min = 1.0
 	particles.scale_amount_max = 2.3
 	var gradient := Gradient.new()
-	var tint := Color("98dce0") if effect.kind == "crash" else Color("d2ffe1")
+	var tint := Color("98dce0") if kind == "crash" else Color("d2ffe1")
 	gradient.set_color(0, tint)
 	tint.a = 0
 	gradient.set_color(1, tint)
 	particles.color_ramp = gradient
-	add_child(particles)
-	particles.emitting = true
-	get_tree().create_timer(1.2).timeout.connect(particles.queue_free)
+	return particles

@@ -77,9 +77,9 @@ The spirit's movement radius is **115 units from its fixed release point**. The 
 - `game/room_model.gd` owns explicit room geometry, movement, collision, focus, possession, and animal returns. Mouse gaps gently guide horizontal movement; the Bear cannot fit through the trunk crossing, and the Bird cannot enter the covered exit.
 - `game/animal_view.gd` draws ordinary animals with scurrying feet, folding wings, banking flight, weight shifts, breathing, and quiet idle motions. Their visual poses do not change collision geometry.
 - `game/room_art.gd` illustrates roots, reclaimed masonry, stream, burrow, perches, food, and hollow trunk. The artwork is procedural placeholder art rather than finished production assets.
-- `game/room_feedback.gd` draws the fixed tether, focused hosts, and possession effects. `game/main.gd` handles native gamepad input, minimal HUD, particles, and vibration.
+- `game/room_feedback.gd` draws the fixed tether, focused hosts, and possession effects. Its web startup warms the particle shader in a temporary undisplayed viewport to avoid compilation on the first release. `game/main.gd` handles native gamepad input, minimal HUD, particles, and vibration.
 - `game/room_audio.gd` owns looping BGM, synthesized SFX, and saved bus volumes. Movement cues read actual animal displacement and pushing state without modifying the model. `game/sound_settings.gd` presents the three volume sliders; `default_bus_layout.tres` routes SFX and BGM through Master.
-- Rules run at 60 ticks per second. Visual positions, facing, gait, and effects interpolate between ticks; pose changes ease continuously. Static scenery retains drawing commands to reduce per-frame work.
+- Rules run at 60 ticks per second. Visual positions, facing, gait, and effects interpolate between ticks; pose changes ease continuously. Static scenery renders once into two transparent textures. Animated ellipses share circle meshes, and curves/outlines update retained GPU buffers through `game/stroke_mesh.gd` instead of recreating them every frame. Antialiased strokes retain their intended visual weight.
 - There are no bugs in this room. The Mouse starts possessed, and the Bird starts foraging before returning to a perch on release.
 
 The original JavaScript prototype is preserved in Git history. Godot replaces its runtime to make further movement, animation, and art iteration practical.
@@ -87,6 +87,28 @@ The original JavaScript prototype is preserved in Git history. Godot replaces it
 ## Checks and exports
 
 Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Startup checks cover splash timing, keyboard/click/gamepad skips, and fresh gameplay without leaking the skip press. Audio checks cover looping across the track boundary, separate bus routing, mute/unmute, saved settings, movement cues, and panel input isolation. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness, audio balance, or physical controller feel; those require playing the build.
+
+For browser performance, use a **16.7 ms frame budget for 60 FPS** and inspect slow frames as well as averages. The optional benchmark exercises movement with audio, movement muted, and spirit movement, recording frame-time percentiles, WebGL draw calls, new buffers, the browser/GPU, and a screenshot in `artifacts/`:
+
+```powershell
+npm install --no-save --package-lock=false playwright
+# Export and serve the game in another terminal first.
+node tools/profile_browser.cjs http://127.0.0.1:5173 current
+```
+
+The benchmark uses installed Edge with its normal GPU settings; set `SPIRITBOUND_BROWSER_CHANNEL=chrome` to use installed Chrome. For a fair comparison, use the same browser, viewport, hardware, and movement sequence, and avoid running builds or tests during measurement. Results describe that machine and browser; they do not guarantee frame pacing on other devices. Check the visible game and its first transitions separately.
+
+On October 9, 2026, hardware-accelerated headless Edge 155 on an AMD Radeon RX 6600 at 1100 × 760 measured the audio build (`0267318`) against the rendering changes:
+
+| Measurement | Before | After |
+| --- | --- | --- |
+| Movement with audio: mean frame time | 31.0 ms | 7.1 ms |
+| Movement with audio: 95th-percentile frame time | 41.5 ms | 7.1 ms |
+| Movement with audio: draw calls per frame | 1,359 | 287 |
+| Movement with audio: new GPU buffers per frame | 637 | 31 |
+| Spirit movement: 95th-percentile frame time | 34.8 ms | 13.9 ms |
+
+The final sample had no movement frames over 16.7 ms, and one spirit frame at 20.9 ms out of 627. This is a substantial improvement, with occasional slow frames still possible. The first-release shader compilation hitch was absent after startup preparation.
 
 Install matching Godot export templates to create builds:
 

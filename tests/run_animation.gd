@@ -24,6 +24,7 @@ func _run() -> void:
 	_disable_automatic_steps(room)
 	_watch_draws(room)
 	await _test_return_input_and_status()
+	await _test_spirit_preparation()
 	for rate in [30, 60, 144]:
 		await _exercise_rate(rate)
 	await process_frame
@@ -32,6 +33,8 @@ func _run() -> void:
 	_expect(int(draw_counts.get("Mouse", 0)) > 1 and int(draw_counts.get("Bird", 0)) > 1 and int(draw_counts.get("Bear", 0)) > 1, "The headless smoke must execute actual animal drawing across pose transitions")
 	_expect(int(draw_counts.get("ReclaimedClearing", 0)) > 1, "The headless smoke must execute moving water and trunk drawing")
 	_expect(int(draw_counts.get("StillForest", 0)) >= 1 and int(draw_counts.get("StillCanopy", 0)) >= 1, "Both cached illustration layers must execute their own CanvasItem drawing")
+	await _test_scenery_cache()
+	_test_stroke_reuse()
 	# Give the audio mixer a cycle to release the continuous music playback.
 	room.queue_free()
 	await create_timer(0.1).timeout
@@ -43,6 +46,61 @@ func _run() -> void:
 			push_error(failure)
 		print("Spiritbound animation checks failed: %d of %d" % [failures.size(), checks])
 		quit(1)
+
+
+func _test_scenery_cache() -> void:
+	var art = room.get_node("ReclaimedClearing")
+	var before := [int(draw_counts.get("StillForest", 0)), int(draw_counts.get("StillCanopy", 0))]
+	await _advance(60, 0.1, Vector2.RIGHT)
+	_expect(before == [int(draw_counts.get("StillForest", 0)), int(draw_counts.get("StillCanopy", 0))], "Moving animals and water must leave the cached scenery untouched")
+	# A different room model must invalidate the illustrations once, while
+	# resetting the existing room must leave its unchanged scenery cached.
+	art.model = preload("res://game/room_model.gd").new()
+	await process_frame
+	await process_frame
+	_expect(int(draw_counts.get("StillForest", 0)) == before[0] + 1 and int(draw_counts.get("StillCanopy", 0)) == before[1] + 1, "Replacing room geometry must redraw both illustration layers once")
+	art.model = game
+	await process_frame
+	await process_frame
+	room.reset_room()
+	_process_views(0.0)
+	before = [int(draw_counts.get("StillForest", 0)), int(draw_counts.get("StillCanopy", 0))]
+	await _advance(60, 0.1)
+	_expect(before == [int(draw_counts.get("StillForest", 0)), int(draw_counts.get("StillCanopy", 0))], "Puzzle reset must preserve the scenery textures")
+
+
+func _test_spirit_preparation() -> void:
+	var spirit = room.get_node("Spirit")
+	var prepared: Array[RID] = []
+	for stroke in spirit._strokes:
+		prepared.append(stroke.mesh.get_rid())
+	_expect(not prepared.is_empty(), "The spirit's drawing meshes must be prepared during startup")
+	game.release()
+	_process_views(0.0)
+	await process_frame
+	await process_frame
+	var displayed: Array[RID] = []
+	for stroke in spirit._strokes:
+		displayed.append(stroke.mesh.get_rid())
+	_expect(spirit.visible and displayed == prepared, "The first spirit appearance must reuse its prepared body and curve meshes")
+	room.reset_room()
+	_process_views(0.0)
+
+
+func _test_stroke_reuse() -> void:
+	var stroke = preload("res://game/stroke_mesh.gd").new()
+	var mesh: ArrayMesh = stroke.update(PackedVector2Array([Vector2.ZERO, Vector2(5, 2), Vector2(10, 0)]), 0.8)
+	var identity := mesh.get_rid()
+	stroke.update(PackedVector2Array([Vector2.ZERO, Vector2(6, -2), Vector2(12, 0)]), 1.4)
+	_expect(mesh.get_rid() == identity and mesh.get_surface_count() == 1, "Animated stroke points and width must reuse their mesh resource")
+	stroke.update(PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2(10, 0), Vector2(10, 10)]), 2.0, true)
+	var vertices: PackedVector2Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var valid := true
+	for vertex in vertices:
+		valid = valid and vertex.is_finite()
+	_expect(mesh.get_rid() == identity and valid, "Stroke topology changes and repeated points must produce finite geometry")
+	stroke.update(PackedVector2Array(), 1.0)
+	_expect(mesh.get_surface_count() == 0, "An empty stroke must clear its previous geometry")
 
 
 func _expect(condition: bool, message: String) -> bool:

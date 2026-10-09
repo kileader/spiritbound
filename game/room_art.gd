@@ -13,19 +13,54 @@ const WATER_LIGHT := Color("#a2ccba")
 const AMBER := Color("#f0d59d")
 
 const TRUNK_SETTLE_SECONDS := 0.3
+const StrokeMesh = preload("res://game/stroke_mesh.gd")
+var _strokes: Array = []
+var _stroke_index: int = 0
+static var _unit_circle := _make_unit_circle()
+static var _circle_mesh := _make_circle_mesh()
+static var _curve_weights := _make_curve_weights()
+
+static func _make_unit_circle() -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in 24:
+		points.append(Vector2.from_angle(TAU * float(index) / 24.0))
+	return points
+
+static func _make_circle_mesh() -> ArrayMesh:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([Vector2.ZERO]) + _unit_circle
+	var indices := PackedInt32Array()
+	for index in _unit_circle.size():
+		indices.append_array(PackedInt32Array([0, index + 1, (index + 1) % _unit_circle.size() + 1]))
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays, [], {}, Mesh.ARRAY_FLAG_USE_2D_VERTICES)
+	return mesh
+
+static func _make_curve_weights() -> Dictionary:
+	var all_weights := {}
+	for steps in [6, 16]:
+		var weights := PackedVector3Array()
+		for index in range(steps + 1):
+			var t := float(index) / float(steps)
+			weights.append(Vector3((1.0 - t) * (1.0 - t), 2.0 * t * (1.0 - t), t * t))
+		all_weights[steps] = weights
+	return all_weights
 
 var model:
 	set(value):
 		model = value
-		# Drawing commands stay cached until the actual room model is replaced.
+		# Refresh both textures when the room geometry is replaced.
 		for layer in [_forest_layer, _canopy_layer]:
 			if is_instance_valid(layer):
 				layer.model = value
 				layer.queue_redraw()
+				layer.get_parent().render_target_update_mode = SubViewport.UPDATE_ONCE
 
-# Two instances of this same script retain their own CanvasItem commands. Their
-# _draw methods execute on those instances, rather than drawing from a signal on
-# another node. Only the parent instance updates moving water and the trunk.
+# Static illustrations render once into transparent viewport textures. Keeping
+# their drawing commands alone still submits hundreds of WebGL calls each frame.
+# Only the parent instance updates moving water and the trunk.
 var _static_layer_kind: int = 0
 var _forest_layer: Node2D
 var _canopy_layer: Node2D
@@ -49,12 +84,25 @@ func _ready() -> void:
 	queue_redraw()
 
 func _make_static_layer(layer_name: String, kind: int, behind: bool) -> Node2D:
+	var cache := SubViewport.new()
+	cache.name = layer_name + "Cache"
+	cache.size = Vector2i(1100, 700)
+	cache.transparent_bg = true
+	cache.disable_3d = true
+	cache.gui_disable_input = true
+	cache.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(cache)
 	var layer: Node2D = get_script().new()
 	layer.name = layer_name
 	layer._static_layer_kind = kind
 	layer.model = model
-	layer.show_behind_parent = behind
-	add_child(layer)
+	cache.add_child(layer)
+	var image := Sprite2D.new()
+	image.name = layer_name + "Image"
+	image.centered = false
+	image.texture = cache.get_texture()
+	image.show_behind_parent = behind
+	add_child(image)
 	return layer
 
 func _process(delta: float) -> void:
@@ -95,21 +143,23 @@ func _random(seed: float) -> float:
 	return fposmod(sin(seed * 127.1 + 311.7) * 43758.5453123, 1.0)
 
 func _ellipse(center: Vector2, radii: Vector2, color: Color, angle: float = 0.0) -> void:
-	var points := PackedVector2Array()
-	for i in range(24):
-		var a := TAU * float(i) / 24.0
-		points.append(center + Vector2(cos(a) * radii.x, sin(a) * radii.y).rotated(angle))
-	draw_colored_polygon(points, color)
+	draw_mesh(_circle_mesh, null, Transform2D(angle, radii, 0.0, center), color)
 
 func _line(points: Array, color: Color, width: float = 1.0) -> void:
-	draw_polyline(PackedVector2Array(points), color, width, true)
+	_stroke(PackedVector2Array(points), color, width)
 
 func _curve(a: Vector2, b: Vector2, c: Vector2, color: Color, width: float, steps: int = 16) -> void:
 	var points := PackedVector2Array()
-	for i in range(steps + 1):
-		var t := float(i) / float(steps)
-		points.append(a * (1.0 - t) * (1.0 - t) + b * 2.0 * t * (1.0 - t) + c * t * t)
-	draw_polyline(points, color, width, true)
+	for weights in _curve_weights[steps]:
+		points.append(a * weights.x + b * weights.y + c * weights.z)
+	_stroke(points, color, width)
+
+func _stroke(points: PackedVector2Array, color: Color, width: float) -> void:
+	if _stroke_index == _strokes.size():
+		_strokes.append(StrokeMesh.new())
+	var stroke = _strokes[_stroke_index]
+	_stroke_index += 1
+	draw_mesh(stroke.update(points, width), null, Transform2D.IDENTITY, Color(color, color.a * minf(1.0, width)))
 
 func _glow(position: Vector2, radius: float, color: Color) -> void:
 	for i in range(6, 0, -1):
@@ -384,6 +434,7 @@ func _draw_perimeter() -> void:
 			_fern(Vector2(16, y + 22), 24, 1.25, Color("#668350"))
 
 func _draw() -> void:
+	_stroke_index = 0
 	if model == null:
 		return
 	if _static_layer_kind == 1:
