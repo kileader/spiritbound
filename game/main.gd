@@ -1,14 +1,16 @@
 extends Node2D
 
 const RoomModel = preload("res://game/room_model.gd")
+const SoundSettings = preload("res://game/sound_settings.gd")
 var model = RoomModel.new()
 var debug := false
 var status_label: Label
 var controller_label: Label
 var return_label: Label
 var last_effect := 0
-var sound_player: AudioStreamPlayer
-var sound_cues: Dictionary = {}
+var sound_settings: Control
+var _resume_input_guard := false
+@onready var audio = $Audio
 
 func _ready() -> void:
 	_setup_input()
@@ -17,10 +19,6 @@ func _ready() -> void:
 			child.model = model
 	$Possession.debug = debug
 	_build_hud()
-	sound_player = AudioStreamPlayer.new()
-	add_child(sound_player)
-	for kind in ["release", "dive", "crash", "win"]:
-		sound_cues[kind] = _make_sound(kind)
 	Input.joy_connection_changed.connect(_controller_changed)
 	_controller_changed(0, false)
 
@@ -35,6 +33,25 @@ func _setup_input() -> void:
 	_bind("target_previous", [KEY_Q], JOY_BUTTON_LEFT_SHOULDER)
 	_bind("target_next", [KEY_E], JOY_BUTTON_RIGHT_SHOULDER)
 	_bind("inspect_room", [KEY_F1], JOY_BUTTON_BACK)
+	_bind("sound_settings", [KEY_M], JOY_BUTTON_START)
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed("sound_settings"):
+		_toggle_sound_settings()
+		get_viewport().set_input_as_handled()
+	elif sound_settings.visible and event.is_action_pressed("return_host"):
+		sound_settings.close()
+		get_viewport().set_input_as_handled()
+
+func _toggle_sound_settings() -> void:
+	if sound_settings.visible:
+		sound_settings.close()
+	else:
+		sound_settings.open()
+
+func _sound_settings_closed() -> void:
+	# UI confirmation/close presses must not release or reclaim an animal.
+	_resume_input_guard = true
 
 func _bind(action: String, keys: Array, button: int, axis: int = -1, value: float = 0.0) -> void:
 	if InputMap.has_action(action):
@@ -55,6 +72,9 @@ func _bind(action: String, keys: Array, button: int, axis: int = -1, value: floa
 		InputMap.action_add_event(action, stick)
 
 func _physics_process(dt: float) -> void:
+	if sound_settings.visible or _resume_input_guard:
+		_resume_input_guard = false
+		return
 	if Input.is_action_just_pressed("reset_room"):
 		reset_room()
 	if Input.is_action_just_pressed("inspect_room"):
@@ -62,13 +82,14 @@ func _physics_process(dt: float) -> void:
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down", 0.18)
 	var cycle := int(Input.is_action_just_pressed("target_next")) - int(Input.is_action_just_pressed("target_previous"))
 	model.step(dt, direction, Input.is_action_just_pressed("possess"), cycle, Input.is_action_just_pressed("return_host"))
+	audio.update_movement(model, dt)
 	_present_feedback()
 	_refresh_status()
 
 func reset_room() -> void:
 	model.reset()
 	last_effect = 0
-	sound_player.stop()
+	audio.stop_sfx()
 	for node in $Possession.get_children():
 		node.queue_free()
 	_refresh_status()
@@ -111,6 +132,13 @@ func _build_hud() -> void:
 	return_label.add_theme_color_override("font_color", Color("a4b8ad"))
 	return_label.add_theme_font_size_override("font_size", 11)
 	bar.add_child(return_label)
+	var sound_button := Button.new()
+	sound_button.position = Vector2(840, 12)
+	sound_button.size = Vector2(105, 32)
+	sound_button.text = "Sound · M"
+	sound_button.focus_mode = Control.FOCUS_NONE
+	sound_button.pressed.connect(_toggle_sound_settings)
+	bar.add_child(sound_button)
 	var inspect := Button.new()
 	inspect.position = Vector2(955, 12)
 	inspect.size = Vector2(122, 32)
@@ -118,6 +146,10 @@ func _build_hud() -> void:
 	inspect.focus_mode = Control.FOCUS_NONE
 	inspect.pressed.connect(_toggle_debug)
 	bar.add_child(inspect)
+	sound_settings = SoundSettings.new()
+	sound_settings.audio = audio
+	sound_settings.closed.connect(_sound_settings_closed)
+	canvas.add_child(sound_settings)
 	_refresh_status()
 
 func _controller_changed(_device: int, _connected: bool) -> void:
@@ -146,35 +178,4 @@ func _present_feedback() -> void:
 		if not devices.is_empty():
 			var strong := 0.24 if effect.kind == "crash" else 0.07
 			Input.start_joy_vibration(devices[0], 0.16, strong, 0.12)
-		_play_sound(effect.kind)
-
-func _play_sound(kind: String) -> void:
-	sound_player.stream = sound_cues[kind]
-	sound_player.volume_db = -13
-	sound_player.play()
-
-func _make_sound(kind: String) -> AudioStreamWAV:
-	# Small synthesized cues: an airy release, a settling dive, and a low splash.
-	# This is one room's sound palette, not an audio or asset management system.
-	var duration := 0.6 if kind == "crash" else 0.25
-	var sample_rate := 22050
-	var bytes := PackedByteArray()
-	bytes.resize(int(duration * sample_rate) * 2)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 47
-	for i in int(duration * sample_rate):
-		var t := float(i) / sample_rate
-		var progress := t / duration
-		var envelope := sin(progress * PI) * pow(1.0 - progress, 2.0)
-		var frequency := lerpf(260.0, 760.0, progress) if kind == "release" else lerpf(650.0, 180.0, progress)
-		var value := sin(t * frequency * TAU) * 0.18
-		if kind == "crash":
-			value = rng.randf_range(-0.3, 0.3) + sin(t * 62 * TAU) * 0.16
-		elif kind == "win":
-			value = (sin(t * 440 * TAU) + sin(t * 660 * TAU)) * 0.12
-		bytes.encode_s16(i * 2, int(clampf(value * envelope, -1.0, 1.0) * 32767))
-	var sound := AudioStreamWAV.new()
-	sound.format = AudioStreamWAV.FORMAT_16_BITS
-	sound.mix_rate = sample_rate
-	sound.data = bytes
-	return sound
+		audio.play_effect(effect.kind)

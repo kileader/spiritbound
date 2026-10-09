@@ -24,7 +24,7 @@ if (-not $GodotPath -or -not (Test-Path -LiteralPath $GodotPath)) {
 switch ($Action) {
     'play' { & $GodotPath --path $projectRoot }
     'test' {
-        foreach ($testScript in @('tests/run_room.gd', 'tests/run_animation.gd', 'tests/run_splash.gd')) {
+        foreach ($testScript in @('tests/run_room.gd', 'tests/run_animation.gd', 'tests/run_splash.gd', 'tests/run_audio.gd')) {
             & $GodotPath --headless --path $projectRoot --script $testScript
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }

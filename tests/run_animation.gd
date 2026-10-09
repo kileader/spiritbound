@@ -32,6 +32,9 @@ func _run() -> void:
 	_expect(int(draw_counts.get("Mouse", 0)) > 1 and int(draw_counts.get("Bird", 0)) > 1 and int(draw_counts.get("Bear", 0)) > 1, "The headless smoke must execute actual animal drawing across pose transitions")
 	_expect(int(draw_counts.get("ReclaimedClearing", 0)) > 1, "The headless smoke must execute moving water and trunk drawing")
 	_expect(int(draw_counts.get("StillForest", 0)) >= 1 and int(draw_counts.get("StillCanopy", 0)) >= 1, "Both cached illustration layers must execute their own CanvasItem drawing")
+	# Give the audio mixer a cycle to release the continuous music playback.
+	room.queue_free()
+	await create_timer(0.1).timeout
 	if failures.is_empty():
 		print("Spiritbound animation checks passed: %d at 30/60/144 Hz" % checks)
 		quit(0)

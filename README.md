@@ -4,9 +4,9 @@
 
 A calm, single-room possession puzzle in Godot. An unexplained spirit moves through ordinary animals in a beautiful, reclaimed natural world. This prototype tests whether moving between bodies feels good, and whether their return behaviours make positioning interesting.
 
-One Mouse, one Bird, one Bear, one exit. No combat, hazards, health, progression, menus, or world framework.
+One Mouse, one Bird, one Bear, one exit. No combat, hazards, health, progression, or world framework.
 
-Development is paused at this playable prototype. Further changes can wait for a later playtest.
+This remains a focused playable prototype. Further gameplay changes can wait for a later playtest.
 
 ## Run
 
@@ -32,6 +32,7 @@ godot --path .
 godot --headless --path . --script tests/run_room.gd
 godot --headless --path . --script tests/run_animation.gd
 godot --headless --path . --script tests/run_splash.gd
+godot --headless --path . --script tests/run_audio.gd
 godot --headless --path . --editor --import --quit
 ```
 
@@ -45,8 +46,17 @@ godot --headless --path . --editor --import --quit
 | Choose another nearby animal | LB / RB | Q / E |
 | Reset puzzle immediately | Y | R |
 | Show debug ranges and animal states | Back / Select | F1 |
+| Open / close sound controls | Start | M or the Sound button |
 
 A nearby animal focuses for 0.23 seconds. An early possession press is buffered, so transfer does not require precise timing. Valid, focused possession always succeeds. While disembodied, B / Escape immediately reclaims the animal you last released at its current position, even if it has returned beyond the tether. This cancels any pending transfer.
+
+## Sound
+
+**Forest Whisper Theme** by **Cleyton Kauffman** plays on a continuous loop during the room. Puzzle reset leaves the music playing. The track is available under CC0; source, composer credit, and import details are in [audio/README.md](audio/README.md).
+
+Open **Sound** with the HUD button, **M**, or gamepad **Start**. Master controls all audio; SFX controls movement, possession, trunk pushing/splash, and completion cues; BGM controls the music. Zero mutes that channel. Changes apply immediately and save locally between launches (`user://audio.cfg`, or browser storage for the web build).
+
+The puzzle pauses while this panel is open and music continues so you can adjust it. Use the mouse, Tab / arrows, or the gamepad D-pad to navigate and adjust sliders. Select **Resume**, or press **M / Start / B / Escape** to close it.
 
 ## Reuse the studio splash
 
@@ -67,7 +77,8 @@ The spirit's movement radius is **115 units from its fixed release point**. The 
 - `game/room_model.gd` owns explicit room geometry, movement, collision, focus, possession, and animal returns. Mouse gaps gently guide horizontal movement; the Bear cannot fit through the trunk crossing, and the Bird cannot enter the covered exit.
 - `game/animal_view.gd` draws ordinary animals with scurrying feet, folding wings, banking flight, weight shifts, breathing, and quiet idle motions. Their visual poses do not change collision geometry.
 - `game/room_art.gd` illustrates roots, reclaimed masonry, stream, burrow, perches, food, and hollow trunk. The artwork is procedural placeholder art rather than finished production assets.
-- `game/room_feedback.gd` draws the fixed tether, focused hosts, and possession effects. `game/main.gd` handles native gamepad input, minimal HUD, particles, vibration, and small synthesized sound cues.
+- `game/room_feedback.gd` draws the fixed tether, focused hosts, and possession effects. `game/main.gd` handles native gamepad input, minimal HUD, particles, and vibration.
+- `game/room_audio.gd` owns looping BGM, synthesized SFX, and saved bus volumes. Movement cues read actual animal displacement and pushing state without modifying the model. `game/sound_settings.gd` presents the three volume sliders; `default_bus_layout.tres` routes SFX and BGM through Master.
 - Rules run at 60 ticks per second. Visual positions, facing, gait, and effects interpolate between ticks; pose changes ease continuously. Static scenery retains drawing commands to reduce per-frame work.
 - There are no bugs in this room. The Mouse starts possessed, and the Bird starts foraging before returning to a perch on release.
 
@@ -75,7 +86,7 @@ The original JavaScript prototype is preserved in Git history. Godot replaces it
 
 ## Checks and exports
 
-Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Startup checks cover splash timing, keyboard/click/gamepad skips, and fresh gameplay without leaking the skip press. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness or physical controller feel; those require playing the build.
+Headless checks exercise the full solution, all animal abilities, returning hosts, fixed release origin, focus buffering, manual target choice, reset, long idle states, and visual interpolation. Animation checks exercise the scene's drawing callbacks and pose transitions at simulated 30, 60, and 144 Hz. Startup checks cover splash timing, keyboard/click/gamepad skips, and fresh gameplay without leaking the skip press. Audio checks cover looping across the track boundary, separate bus routing, mute/unmute, saved settings, movement cues, and panel input isolation. Script/import checks catch GDScript errors. These checks do not establish perceived smoothness, audio balance, or physical controller feel; those require playing the build.
 
 Install matching Godot export templates to create builds:
 

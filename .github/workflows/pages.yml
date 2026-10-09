@@ -26,11 +26,12 @@ jobs:
           include-templates: true
       - name: Import project
         run: godot --headless --path . --editor --import --quit
-      - name: Check puzzle, animation, and startup
+      - name: Check puzzle, animation, startup, and audio
         run: |
           godot --headless --path . --script tests/run_room.gd
           godot --headless --path . --script tests/run_animation.gd
           godot --headless --path . --script tests/run_splash.gd
+          godot --headless --path . --script tests/run_audio.gd
       - name: Export browser build
         run: |
           mkdir -p builds/web

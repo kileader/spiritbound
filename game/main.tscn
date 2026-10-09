@@ -1,12 +1,16 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://game/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://game/room_art.gd" id="2_art"]
 [ext_resource type="Script" path="res://game/room_feedback.gd" id="3_fx"]
 [ext_resource type="Script" path="res://game/animal_view.gd" id="4_animal"]
+[ext_resource type="Script" path="res://game/room_audio.gd" id="5_audio"]
 
 [node name="Spiritbound" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="Audio" type="Node" parent="."]
+script = ExtResource("5_audio")
 
 [node name="ReclaimedClearing" type="Node2D" parent="."]
 script = ExtResource("2_art")

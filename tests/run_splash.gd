@@ -114,6 +114,8 @@ func _run() -> void:
 	splash._finish()
 	await scene_changed
 	_expect(current_scene.scene_file_path == "res://tests/splash_destination.tscn", "The shared splash must enter any configured destination scene")
+	# Let the audio mixer release the room's stopped music after scene removal.
+	await create_timer(0.1).timeout
 
 	if failures.is_empty():
 		print("Phicid startup splash checks passed: %d" % checks)
